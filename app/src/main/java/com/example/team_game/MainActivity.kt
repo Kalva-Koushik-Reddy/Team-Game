@@ -220,7 +220,6 @@ class MainActivity : ComponentActivity() {
                                         if (it.name == teamToUpdate.name) it.copy(name = newName) else it
                                     }
                                 } else {
-                                    // TODO: Show Snackbar for "Team name already exists"
                                     println("Error: Team name '$newName' already exists.")
                                 }
                             }
