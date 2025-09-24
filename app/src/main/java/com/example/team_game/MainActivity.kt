@@ -6,29 +6,21 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalConfiguration
+import com.example.team_game.pages.TeamHomePage
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import androidx.core.content.edit // For SharedPreferences KTX
+import androidx.core.content.edit
 import com.example.team_game.ui.theme.TeamGameTheme
 import org.json.JSONArray
 import org.json.JSONObject
@@ -39,10 +31,7 @@ private const val TEAMS_KEY = "teams"
 private const val CURRENT_NUMBER_OF_TEAMS_KEY = "current_number_of_teams"
 private const val INITIAL_SETUP_DONE_KEY = "initial_setup_done"
 
-data class Team(var name: String, var score: Int = 0)
-
 class MainActivity : ComponentActivity() {
-
     private fun saveAppState(
         context: Context,
         teams: List<Team>,
@@ -249,7 +238,7 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class) // For AlertDialog, OutlinedTextField
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun NumberOfTeamsInputDialog(
     title: String,
@@ -258,7 +247,7 @@ fun NumberOfTeamsInputDialog(
     onDismiss: () -> Unit,
     onConfirm: (Int) -> Unit,
 ) {
-    var text by remember(initialValue) { mutableStateOf(initialValue) } // Key initialValue for recomposition if needed
+    var text by remember(initialValue) { mutableStateOf(initialValue) }
     val keyboardController = LocalSoftwareKeyboardController.current
 
     AlertDialog(
@@ -268,7 +257,6 @@ fun NumberOfTeamsInputDialog(
             OutlinedTextField(
                 value = text,
                 onValueChange = {
-                    // Allow only up to 2 digits and ensure they are numbers
                     if (it.length <= 2 && it.all { char -> char.isDigit() }) {
                         text = it
                     }
@@ -285,7 +273,6 @@ fun NumberOfTeamsInputDialog(
                         onConfirm(count)
                         keyboardController?.hide()
                     }
-                    // TODO: Provide visual feedback for invalid input if "Done" is pressed
                 })
             )
         },
@@ -295,7 +282,6 @@ fun NumberOfTeamsInputDialog(
                 if (count != null && count > 0) {
                     onConfirm(count)
                 }
-                // TODO: Provide visual feedback for invalid input on confirm button press
             }) { Text(confirmButtonText) }
         },
         dismissButton = {
@@ -304,229 +290,16 @@ fun NumberOfTeamsInputDialog(
     )
 }
 
-@Composable
-fun TeamHomePage( // Removed @SuppressLint as BoxWithConstraints is no longer used
-    teams: List<Team>,
-    onResetAllScores: () -> Unit,
-    onTeamScoreChange: (Team, Int) -> Unit,
-    onTeamNameChange: (Team, String) -> Unit,
-    onChangeTeamCount: () -> Unit,
-    onRestartGame: () -> Unit
-) {
-    // This check is good, but MainActivity logic should prevent empty teams after setup.
-    if (teams.isEmpty()) {
-        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            Text("No teams configured. Please use game options to set up teams.")
-        }
-        return
-    }
-
-    var showResetAllDialog by remember { mutableStateOf(false) }
-    val configuration = LocalConfiguration.current
-    val screenWidthDp = configuration.screenWidthDp.dp
-
-    // Define spacing and padding once
-    val itemSpacing = 8.dp
-    val horizontalGridPadding = 8.dp
-
-    // Calculate item width for a 2-column grid
-    val itemWidth = (screenWidthDp - (horizontalGridPadding * 2) - itemSpacing) / 2
-
-    Column(modifier = Modifier.fillMaxSize()) {
-        LazyVerticalGrid(
-            columns = GridCells.Fixed(2),
-            modifier = Modifier
-                .weight(1f) // Grid takes available space
-                .fillMaxWidth(),
-            contentPadding = PaddingValues(
-                horizontal = horizontalGridPadding,
-                vertical = 8.dp // Consistent vertical padding
-            ),
-            verticalArrangement = Arrangement.spacedBy(itemSpacing),
-            horizontalArrangement = Arrangement.spacedBy(itemSpacing)
-        ) {
-            items(teams, key = { team -> team.name }) { team -> // Use team name as a key if they are unique
-                Box(
-                    modifier = Modifier
-                        .width(itemWidth)
-                        .height(itemWidth) // Enforce square aspect ratio
-                ) {
-                    TeamBox(
-                        team = team,
-                        onScoreChange = { newScore -> onTeamScoreChange(team, newScore) },
-                        onNameChange = { newName -> onTeamNameChange(team, newName) }
-                    )
-                }
-            }
-        }
-
-        // Action Buttons Row
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 8.dp, horizontal = 4.dp), // Added horizontal padding for buttons
-            horizontalArrangement = Arrangement.spacedBy(2.dp, Alignment.CenterHorizontally), // Better spacing and centering
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            // Using weight to distribute space more evenly for buttons if needed, or fixed sizes
-            Button(onClick = { showResetAllDialog = true }) { Text("Reset Scores") }
-            Button(onClick = onChangeTeamCount) { Text("Change Teams") }
-            Button(onClick = onRestartGame) { Text("Restart") }
-        }
-    }
-
-    if (showResetAllDialog) {
-        AlertDialog(
-            onDismissRequest = { showResetAllDialog = false },
-            title = { Text("Reset All Scores?") },
-            text = { Text("Are you sure you want to reset all team scores to 0 (names will be kept)?") },
-            confirmButton = {
-                TextButton(onClick = {
-                    onResetAllScores()
-                    showResetAllDialog = false
-                }) { Text("Confirm") }
-            },
-            dismissButton = {
-                TextButton(onClick = { showResetAllDialog = false }) { Text("Cancel") }
-            }
-        )
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class) // For AlertDialog, OutlinedTextField
-@Composable
-fun TeamBox(
-    team: Team,
-    onScoreChange: (Int) -> Unit,
-    onNameChange: (String) -> Unit
-) {
-    var score by remember(team.score) { mutableIntStateOf(team.score) }
-    var showResetDialogInBox by remember { mutableStateOf(false) }
-    var showEditNameDialog by remember { mutableStateOf(false) }
-    val keyboardController = LocalSoftwareKeyboardController.current
-
-    Card(modifier = Modifier.fillMaxSize()) {
-        Column(
-            modifier = Modifier
-                .padding(8.dp)
-                .fillMaxSize(),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.SpaceAround // Use SpaceAround for better vertical distribution
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                // Invisible Spacer to balance the IconButton, ensuring Text is truly centered
-                Spacer(Modifier.size(25.dp)) // Match IconButton's tappable area
-
-                Text(
-                    text = team.name,
-                    fontSize = 18.sp,
-                    textAlign = TextAlign.Center,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f) // Text takes all available space in the middle
-                )
-
-                IconButton(
-                    onClick = { showEditNameDialog = true },
-                    modifier = Modifier.size(25.dp) // Standard touch target size
-                ) {
-                    Icon(
-                        Icons.Filled.Edit,
-                        contentDescription = "Edit ${team.name}",
-                        modifier = Modifier.size(20.dp) // Icon visual size
-                    )
-                }
-            }
-
-            Text(
-                text = "Score: ${team.score}", // Read directly from team.score for consistency
-                fontSize = 20.sp,
-                textAlign = TextAlign.Center
-            )
-
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                // Make +/- buttons slightly smaller if needed, or ensure they fit
-                Button(onClick = { onScoreChange(score - 1) }, modifier = Modifier.weight(1f).heightIn(min = 36.dp)) { Text("-") }
-                Button(onClick = { onScoreChange(score + 1) }, modifier = Modifier.weight(1f).heightIn(min = 36.dp)) { Text("+") }
-            }
-
-            Button(
-                onClick = { showResetDialogInBox = true },
-                modifier = Modifier
-                    .fillMaxWidth(0.8f) // Take 80% of width
-                    .heightIn(min = 36.dp)
-            ) {
-                Text("Reset Score", fontSize = 12.sp)
-            }
-        }
-    }
-
-    // --- Dialogs for Reset Score and Edit Name ---
-    if (showResetDialogInBox) {
-        AlertDialog(
-            onDismissRequest = { showResetDialogInBox = false },
-            title = { Text("Reset Score for ${team.name}?") },
-            text = { Text("Are you sure you want to reset the score for ${team.name} to 0?") },
-            confirmButton = {
-                TextButton(onClick = {
-                    onScoreChange(0) // Directly update with the new score
-                    showResetDialogInBox = false
-                }) { Text("Confirm") }
-            },
-            dismissButton = { TextButton(onClick = { showResetDialogInBox = false }) { Text("Cancel") } }
-        )
-    }
-
-    if (showEditNameDialog) {
-        var newNameInput by remember(team.name) { mutableStateOf(team.name) }
-        AlertDialog(
-            onDismissRequest = { showEditNameDialog = false },
-            title = { Text("Edit Team Name") },
-            text = {
-                OutlinedTextField(
-                    value = newNameInput,
-                    onValueChange = { newNameInput = it },
-                    label = { Text("New Name") },
-                    singleLine = true,
-                    keyboardOptions = KeyboardOptions.Default.copy(imeAction = ImeAction.Done),
-                    keyboardActions = KeyboardActions(onDone = {
-                        if (newNameInput.isNotBlank()) {
-                            onNameChange(newNameInput)
-                        }
-                        showEditNameDialog = false
-                        keyboardController?.hide()
-                    })
-                )
-            },
-            confirmButton = {
-                TextButton(onClick = {
-                    if (newNameInput.isNotBlank()) {
-                        onNameChange(newNameInput)
-                    }
-                    showEditNameDialog = false
-                }) { Text("Save") }
-            },
-            dismissButton = { TextButton(onClick = { showEditNameDialog = false }) { Text("Cancel") } }
-        )
-    }
-}
-
 @Preview(showBackground = true, widthDp = 380, heightDp = 700)
 @Composable
 fun DefaultPreview() {
     TeamGameTheme {
-        // Using a more stable list for preview if state changes aren't directly tested here
         val sampleTeams = listOf(
             Team("The Dragons of the North", 5), Team("Team Beta", 10),
             Team("Strikers", 3), Team("Delta Force X", 8),
             Team("Victories Secret", 12), Team("Foxtrot", 2)
         )
+
         TeamHomePage(
             teams = sampleTeams,
             onResetAllScores = {},
